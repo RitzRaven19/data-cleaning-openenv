@@ -118,6 +118,25 @@ def env_step(episode_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
         json={"episode_id": episode_id, "action": action},
         timeout=30,
     )
+    if r.status_code == 422:
+        # Validation error — sanitize issue_type values and retry once
+        VALID_ISSUE_TYPES = {
+            "missing_required", "wrong_type", "invalid_range",
+            "invalid_format", "invalid_enum", "duplicate", "outlier",
+        }
+        if action.get("action_type") in ("report_issues",) and action.get("issues"):
+            for issue in action["issues"]:
+                if issue.get("issue_type") not in VALID_ISSUE_TYPES:
+                    issue["issue_type"] = "invalid_format"   # safe fallback
+            r2 = requests.post(
+                f"{ENV_BASE_URL}/step",
+                json={"episode_id": episode_id, "action": action},
+                timeout=30,
+            )
+            if r2.status_code == 200:
+                return r2.json()
+        print(f"  [WARN] 422 on step — {r.text[:200]}", flush=True)
+        r.raise_for_status()
     r.raise_for_status()
     return r.json()
 
@@ -454,7 +473,12 @@ def run_task_pipeline() -> float:
         raw         = call_llm(sys_prompt, user_msg)
         action_dict = extract_json(raw) or _PIPELINE_FALLBACKS.get(phase, {"action_type": phase})
 
-        step_result = env_step(eid, action_dict)
+        try:
+            step_result = env_step(eid, action_dict)
+        except Exception as exc:
+            print(f"  [WARN] Step failed ({exc}), using fallback action", flush=True)
+            fallback = _PIPELINE_FALLBACKS.get(phase, {"action_type": phase})
+            step_result = env_step(eid, fallback)
         obs         = step_result["observation"]
         reward      = float(step_result.get("reward", 0.0))
         done        = bool(step_result.get("done", False))
