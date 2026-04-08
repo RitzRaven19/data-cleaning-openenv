@@ -9,6 +9,7 @@ description = "OpenEnv environment for real-world data cleaning tasks"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+  "openenv-core>=0.2.0",
   "fastapi==0.111.0",
   "uvicorn[standard]==0.29.0",
   "pydantic==2.7.1",
@@ -17,3 +18,5 @@ dependencies = [
   "pyyaml>=6.0",
 ]
 
+[project.scripts]
+server = "server.app:main"
