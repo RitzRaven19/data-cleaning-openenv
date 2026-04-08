@@ -221,7 +221,7 @@ PIPELINE_ISSUES: List[Dict[str, Any]] = [
      "description": "Required field 'department' is null"},
     {"row_index": 21, "column": "hire_date",    "issue_type": "invalid_format",
      "description": "hire_date '2021/08/22' uses slashes instead of dashes"},
-    {"row_index": 23, "column": "vacation_days","issue_type": "invalid_range",
+    {"row_index": 22, "column": "vacation_days","issue_type": "invalid_range",
      "description": "vacation_days -7 is below minimum 0"},
     {"row_index": 24, "column": "email",        "issue_type": "invalid_format",
      "description": "Email 'notanemail' is missing '@'"},
