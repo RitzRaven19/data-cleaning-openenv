@@ -22,6 +22,11 @@ and analysts perform every day.
 
 ---
 
+## Deployed Space
+
+- Hugging Face Space: https://huggingface.co/spaces/ritzravenweak/data-cleaning-env
+- Live endpoint: https://ritzravenweak-data-cleaning-env.hf.space
+
 ## Motivation
 
 Data quality is a universal bottleneck. Industry surveys consistently report
@@ -256,8 +261,8 @@ Measured with `Qwen/Qwen2.5-72B-Instruct` via `python inference.py`:
 |------|-------|-------|
 | Schema Validation (easy) | **0.8370** | 11/13 exact matches, 1 partial; F1=0.84 |
 | Standardization (medium) | **1.0000** | All 5 columns 100% correct |
-| Pipeline (hard) | **0.5460** | audit=0.40, identify=0.42, fix=0.40, validate=1.0 |
-| **Overall average** | **0.7943** | |
+| Pipeline (hard) | **0.5660** | Multi-phase reward with partial credit across audit/identify/fix/validate |
+| **Overall average** | **0.8010** | |
 
 The hard task has clear headroom — audit and identify phases are the bottleneck,
 making it a useful training target for RL fine-tuning.

@@ -198,4 +198,8 @@ def validate_env():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 7860))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
+    try:
+        uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
+    except KeyboardInterrupt:
+        # Expected when stopping the dev server with Ctrl+C.
+        print("Server stopped.")
