@@ -543,9 +543,10 @@ def main() -> None:
         print("FINAL BASELINE SCORES", flush=True)
         print("=" * 60, flush=True)
         for task, score in scores.items():
-            bar = "█" * int(score * 20) + "░" * (20 - int(score * 20))
-            print(f"  {task:<25} {bar}  {score:.4f}", flush=True)
-        print(f"\n  {'Overall average':<25} {'─' * 20}  {overall:.4f}", flush=True)
+            filled = int(score * 20)
+            bar = "#" * filled + "-" * (20 - filled)
+            print(f"  {task:<25} [{bar}]  {score:.4f}", flush=True)
+        print(f"\n  {'Overall average':<25} {'-' * 22}  {overall:.4f}", flush=True)
         print("=" * 60, flush=True)
 
         # Write results file for CI / automated validation

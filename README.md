@@ -250,17 +250,17 @@ curl -s -X POST http://localhost:7860/step \
 
 ## Baseline Scores
 
-Approximate scores with `Qwen/Qwen2.5-72B-Instruct`:
+Measured with `Qwen/Qwen2.5-72B-Instruct` via `python inference.py`:
 
-| Task | Score |
-|------|-------|
-| Schema Validation (easy) | ~0.72 |
-| Standardization (medium) | ~0.65 |
-| Pipeline (hard) | ~0.48 |
-| **Overall average** | **~0.62** |
+| Task | Score | Notes |
+|------|-------|-------|
+| Schema Validation (easy) | **0.8370** | 11/13 exact matches, 1 partial; F1=0.84 |
+| Standardization (medium) | **1.0000** | All 5 columns 100% correct |
+| Pipeline (hard) | **0.5460** | audit=0.40, identify=0.42, fix=0.40, validate=1.0 |
+| **Overall average** | **0.7943** | |
 
-These scores represent a reasonable but improvable baseline — the environment
-has plenty of headroom for RL fine-tuning.
+The hard task has clear headroom — audit and identify phases are the bottleneck,
+making it a useful training target for RL fine-tuning.
 
 ---
 
