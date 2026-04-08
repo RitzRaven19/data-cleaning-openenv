@@ -1,0 +1,139 @@
+spec_version: 1
+name: data-cleaning-env
+version: "1.0.0"
+description: >
+  A real-world OpenEnv environment where AI agents learn to detect, diagnose,
+  and fix data quality issues in tabular datasets. Three tasks span an
+  easy-to-hard difficulty range covering schema validation, format
+  standardization, and a multi-step cleaning pipeline.
+author: Ritu Dey
+tags:
+  - openenv
+  - data-quality
+  - real-world
+  - tabular
+
+# ── Runtime ───────────────────────────────────────────────────────────────────
+type: space
+runtime: fastapi
+app: app:app
+port: 7860
+
+# ── Endpoints (OpenEnv spec §3) ───────────────────────────────────────────────
+endpoints:
+  reset:    POST /reset
+  step:     POST /step
+  state:    GET  /state/{episode_id}
+  health:   GET  /health
+  schema:   GET  /schema
+  metadata: GET  /metadata
+  tasks:    GET  /tasks
+  validate: POST /validate
+
+# ── Reward ────────────────────────────────────────────────────────────────────
+reward_range: [0.0, 1.0]
+reward_description: >
+  All rewards are normalised to [0.0, 1.0]. Partial credit is awarded
+  throughout each episode so the agent receives signal on every step,
+  not only at the terminal state.
+
+# ── Observation space ─────────────────────────────────────────────────────────
+observation_space:
+  type: object
+  description: DataObservation (Pydantic model in env/models.py)
+  properties:
+    episode_id:        {type: string}
+    task_type:         {type: string, enum: [schema_validation, standardization, pipeline]}
+    dataset_name:      {type: string}
+    dataset_sample:    {type: array,  description: "First N rows of the current dataset"}
+    total_rows:        {type: integer}
+    schema:            {type: object, description: "Column schema with type and constraint rules"}
+    column_stats:      {type: object, description: "Per-column dtype, null_count, unique_count, sample_values"}
+    current_step:      {type: integer}
+    max_steps:         {type: integer}
+    pipeline_phase:    {type: string, enum: [audit, identify, fix, validate], nullable: true}
+    available_actions: {type: array,  items: {type: string}}
+    reward:            {type: number, description: "Reward from the most recent step"}
+    done:              {type: boolean}
+    cumulative_reward: {type: number}
+    context:           {type: object, description: "Task-specific hints and metadata"}
+
+# ── Action space ──────────────────────────────────────────────────────────────
+action_space:
+  type: object
+  description: DataAction (Pydantic model in env/models.py)
+  properties:
+    action_type:
+      type: string
+      enum: [report_issues, apply_transforms, audit, fix, validate]
+    issues:
+      type: array
+      description: "List of DataIssue objects (used with report_issues)"
+      nullable: true
+    transforms:
+      type: object
+      description: "Map of column to ColumnTransform (used with apply_transforms)"
+      nullable: true
+    audit_summary:
+      type: string
+      description: "2-4 sentence audit summary (used with audit)"
+      nullable: true
+    issue_categories:
+      type: array
+      description: "Issue category names spotted during audit"
+      nullable: true
+    fix_operations:
+      type: array
+      description: "List of FixOperation objects (used with fix)"
+      nullable: true
+    validation_report:
+      type: string
+      description: "Validation report text (used with validate)"
+      nullable: true
+    issues_remaining:
+      type: integer
+      description: "Agent estimate of remaining unfixed issues"
+      nullable: true
+
+# ── Tasks ─────────────────────────────────────────────────────────────────────
+tasks:
+  - id: schema_validation
+    name: "Schema Validation"
+    difficulty: easy
+    max_steps: 1
+    description: >
+      A 30-row customer CRM export contains 13 data quality issues across seven
+      columns (id, name, email, phone, age, status, created_at). The agent must
+      report all issues as a single 'report_issues' action. Graded via F1 over
+      (row_index, column, issue_type) tuples with 0.3x partial credit for
+      correct row+column with wrong issue_type.
+    action_types: [report_issues]
+    reward_components: [precision, recall, f1_score]
+
+  - id: standardization
+    name: "Format Standardization"
+    difficulty: medium
+    max_steps: 1
+    description: >
+      A 20-row sales dataset has five columns with inconsistent formatting
+      (dates, phone numbers, currency values, names, regions). The agent must
+      define transformation rules that normalise every value to the specified
+      target format. Graded by applying transforms to all rows and comparing
+      results to deterministic ground-truth expected values.
+    action_types: [apply_transforms]
+    reward_components: [per_column_accuracy, mean_column_score]
+
+  - id: pipeline
+    name: "Multi-step Cleaning Pipeline"
+    difficulty: hard
+    max_steps: 8
+    description: >
+      A 25-row employee dataset has multiple categories of data quality issues.
+      The agent works through a four-phase pipeline: (1) audit - identify issue
+      categories; (2) identify - enumerate specific issues per row/column;
+      (3) fix - provide corrective values; (4) validate - confirm data quality
+      and estimate remaining issues. Episode score is a weighted average
+      (audit 15%, identify 30%, fix 40%, validate 15%) with a +0.05 efficiency
+      bonus for completing all four phases without wasted steps.
+    action_types: [audit, report_issues, fix, validate]
+    reward_components: [audit_recall, identify_f1, fix_recall, validate_rubric, efficiency_bonus]
