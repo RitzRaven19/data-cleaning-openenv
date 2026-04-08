@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -68,7 +68,7 @@ class StepRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/reset", response_model=ResetResult)
-def reset(req: ResetRequest):
+def reset(req: ResetRequest = Body(default_factory=ResetRequest)):
     """Start a new episode for the given task. Returns the initial observation."""
     try:
         return ENV.reset(task_id=req.task_id)
