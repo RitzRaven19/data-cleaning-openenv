@@ -28,6 +28,17 @@ def _predicted_key(issue: DataIssue) -> tuple:
     return (issue.row_index, issue.column, issue.issue_type.value)
 
 
+_STRICT_EPS = 0.0001
+
+
+def _strict_open_score(value: float) -> float:
+    """
+    Enforce score in the open interval (0, 1) required by Phase 2.
+    """
+    bounded = min(max(value, _STRICT_EPS), 1.0 - _STRICT_EPS)
+    return round(bounded, 4)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Task 1 – Schema Validation
 # ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +54,7 @@ def grade_schema_validation(
     """
     if action.action_type != "report_issues" or not action.issues:
         return RewardBreakdown(
-            total=0.0,
+            total=_strict_open_score(0.0),
             components={"precision": 0.0, "recall": 0.0, "f1": 0.0},
             feedback="No issues reported. Action must be 'report_issues' with a non-empty 'issues' list.",
         )
@@ -70,11 +81,11 @@ def grade_schema_validation(
     else:
         f1 = 2 * precision * recall / (precision + recall)
 
-    total = round(min(f1, 1.0), 4)
+    total = _strict_open_score(f1)
 
     # Penalty for excessive false positives (> 2× ground truth count)
     if len(pred_keys) > 2 * len(gt_keys):
-        total = round(total * 0.85, 4)
+        total = _strict_open_score(total * 0.85)
 
     feedback_parts = [
         f"Ground truth: {len(gt_keys)} issues.",
@@ -197,7 +208,7 @@ def grade_standardization(
     """
     if action.action_type != "apply_transforms" or not action.transforms:
         return RewardBreakdown(
-            total=0.0,
+            total=_strict_open_score(0.0),
             components={},
             feedback="Action must be 'apply_transforms' with a non-empty 'transforms' dict.",
         )
@@ -230,7 +241,7 @@ def grade_standardization(
 
         col_scores[col] = correct / n
 
-    total = round(sum(col_scores.values()) / len(col_scores), 4) if col_scores else 0.0
+    total = _strict_open_score(sum(col_scores.values()) / len(col_scores)) if col_scores else _strict_open_score(0.0)
 
     feedback_parts = []
     for col, score in col_scores.items():
@@ -258,7 +269,7 @@ def grade_pipeline_audit(
     """
     if action.action_type != "audit":
         return RewardBreakdown(
-            total=0.0,
+            total=_strict_open_score(0.0),
             components={"categories_found": 0},
             feedback="Action must be 'audit' for the audit phase.",
         )
@@ -275,7 +286,7 @@ def grade_pipeline_audit(
             found += 1
             matched.append(cat)
 
-    score = round(found / len(known_categories), 4) if known_categories else 0.0
+    score = _strict_open_score(found / len(known_categories)) if known_categories else _strict_open_score(0.0)
 
     return RewardBreakdown(
         total=score,
@@ -312,7 +323,7 @@ def grade_pipeline_fix(
     """
     if action.action_type != "fix" or not action.fix_operations:
         return RewardBreakdown(
-            total=0.0,
+            total=_strict_open_score(0.0),
             components={"addressed": 0},
             feedback="Action must be 'fix' with non-empty 'fix_operations'.",
         )
@@ -330,7 +341,7 @@ def grade_pipeline_fix(
 
     recall = len(addressed) / len(known_issues) if known_issues else 0.0
     penalty = min(spurious * 0.05, 0.30)
-    total   = round(max(recall - penalty, 0.0), 4)
+    total = _strict_open_score(max(recall - penalty, 0.0))
 
     return RewardBreakdown(
         total=total,
@@ -364,7 +375,7 @@ def grade_pipeline_validate(
     """
     if action.action_type != "validate":
         return RewardBreakdown(
-            total=0.0,
+            total=_strict_open_score(0.0),
             components={},
             feedback="Action must be 'validate' for the validate phase.",
         )
@@ -391,7 +402,7 @@ def grade_pipeline_validate(
     if consistency_ok:      score += 0.15
 
     return RewardBreakdown(
-        total=round(score, 4),
+        total=_strict_open_score(score),
         components={
             "length_ok":          length_ok,
             "mentions_issues":    mentions_issues,
@@ -425,4 +436,4 @@ def grade_pipeline_episode(step_scores: Dict[str, float]) -> float:
     if len(step_scores) == 4:   # exactly the 4 required phases, no wasted steps
         total += 0.05
 
-    return round(min(total, 1.0), 4)
+    return _strict_open_score(total)
