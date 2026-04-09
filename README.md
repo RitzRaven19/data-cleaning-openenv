@@ -260,7 +260,7 @@ Measured with `Qwen/Qwen2.5-72B-Instruct` via `python inference.py`:
 | Task | Score | Notes |
 |------|-------|-------|
 | Schema Validation (easy) | **0.8370** | 11/13 exact matches, 1 partial; F1=0.84 |
-| Standardization (medium) | **1.0000** | All 5 columns 100% correct |
+| Standardization (medium) | **0.9999** | Near-perfect transform accuracy (strict open score range) |
 | Pipeline (hard) | **0.5660** | Multi-phase reward with partial credit across audit/identify/fix/validate |
 | **Overall average** | **0.8010** | |
 

@@ -51,12 +51,19 @@ MAX_STEPS   = 8       # safety cap per episode
 TEMPERATURE = 0.1     # low temperature for reproducibility
 MAX_TOKENS  = 1200
 TASKS       = ["schema_validation", "standardization", "pipeline"]
+STRICT_EPS  = 0.0001
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenAI client (uses API_BASE_URL + HF_TOKEN per spec)
 # ─────────────────────────────────────────────────────────────────────────────
 
 client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+
+
+def strict_open_score(value: float) -> float:
+    """Clamp score into strict open interval (0, 1)."""
+    bounded = min(max(value, STRICT_EPS), 1.0 - STRICT_EPS)
+    return round(bounded, 4)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -415,6 +422,7 @@ def run_task_schema_validation() -> float:
         issues_reported=len(action_dict.get("issues") or []),
         feedback=reward_breakdown.get("feedback", ""),
     )
+    reward = strict_open_score(reward)
     log_end(task_id, total_reward=reward, steps=1, success=reward >= 0.5)
     return reward
 
@@ -446,6 +454,7 @@ def run_task_standardization() -> float:
         columns_transformed=cols,
         feedback=reward_breakdown.get("feedback", ""),
     )
+    reward = strict_open_score(reward)
     log_end(task_id, total_reward=reward, steps=1, success=reward >= 0.5)
     return reward
 
@@ -501,7 +510,8 @@ def run_task_pipeline() -> float:
         if done:
             break
 
-    final_score  = info.get("final_pipeline_score", 0.0)
+    final_score  = float(info.get("final_pipeline_score", cumulative_reward))
+    final_score  = strict_open_score(final_score)
     phase_scores = info.get("phase_scores", {})
 
     log_end(
@@ -537,7 +547,7 @@ def main() -> None:
         scores["standardization"]   = run_task_standardization()
         scores["pipeline"]          = run_task_pipeline()
 
-        overall = round(sum(scores.values()) / len(scores), 4)
+        overall = strict_open_score(sum(scores.values()) / len(scores))
 
         print("\n" + "=" * 60, flush=True)
         print("FINAL BASELINE SCORES", flush=True)
