@@ -118,7 +118,7 @@ class DataObservation(BaseModel):
 
     # Per-step reward and terminal flag — matches OpenEnv Observation contract
     # (same pattern as echo_env: EchoObservation has reward + done fields)
-    reward: float = 0.0
+    reward: float = 1e-7   # never exactly 0 — validator requires strictly (0, 1)
     done:   bool  = False
 
     # Cumulative reward so far (informational)
@@ -176,7 +176,7 @@ class DataAction(BaseModel):
 # ─────────────────────────────────────────────
 
 class RewardBreakdown(BaseModel):
-    total: float = Field(..., ge=0.0, le=1.0)
+    total: float = Field(..., gt=0.0, lt=1.0)   # strict open interval — never 0.0 or 1.0
     components: Dict[str, Any] = Field(default_factory=dict)
     feedback: str = ""
 

@@ -51,7 +51,7 @@ MAX_STEPS   = 8       # safety cap per episode
 TEMPERATURE = 0.1     # low temperature for reproducibility
 MAX_TOKENS  = 1200
 TASKS       = ["schema_validation", "standardization", "pipeline"]
-STRICT_EPS  = 0.0001
+STRICT_EPS  = 1e-7
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenAI client (uses API_BASE_URL + HF_TOKEN per spec)
@@ -61,9 +61,8 @@ client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
 
 def strict_open_score(value: float) -> float:
-    """Clamp score into strict open interval (0, 1)."""
-    bounded = min(max(value, STRICT_EPS), 1.0 - STRICT_EPS)
-    return round(bounded, 4)
+    """Clamp score into strict open interval (0, 1). No rounding — round() can collapse 1e-7 to 0.0."""
+    return max(STRICT_EPS, min(1.0 - STRICT_EPS, float(value)))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -408,7 +407,7 @@ def run_task_schema_validation() -> float:
     action_dict = extract_json(raw) or {"action_type": "report_issues", "issues": []}
 
     step_result      = env_step(eid, action_dict)
-    reward           = float(step_result.get("reward", 0.0))
+    reward           = float(step_result.get("reward", 1e-7))
     done             = bool(step_result.get("done", True))
     metadata         = step_result.get("metadata", {})
     reward_breakdown = metadata.get("reward_breakdown", {})
@@ -439,7 +438,7 @@ def run_task_standardization() -> float:
     action_dict = extract_json(raw) or {"action_type": "apply_transforms", "transforms": {}}
 
     step_result      = env_step(eid, action_dict)
-    reward           = float(step_result.get("reward", 0.0))
+    reward           = float(step_result.get("reward", 1e-7))
     done             = bool(step_result.get("done", True))
     metadata         = step_result.get("metadata", {})
     reward_breakdown = metadata.get("reward_breakdown", {})
@@ -489,7 +488,7 @@ def run_task_pipeline() -> float:
             fallback = _PIPELINE_FALLBACKS.get(phase, {"action_type": phase})
             step_result = env_step(eid, fallback)
         obs         = step_result["observation"]
-        reward      = float(step_result.get("reward", 0.0))
+        reward      = float(step_result.get("reward", 1e-7))
         done        = bool(step_result.get("done", False))
         info        = step_result.get("metadata", {})
         bd          = info.get("reward_breakdown", {})

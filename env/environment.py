@@ -56,7 +56,7 @@ class _Episode:
         )
         # For pipeline – accumulate per-phase scores
         self.pipeline_scores: Dict[str, float] = {}
-        self._last_reward: float = 0.0   # reward from the most recent step
+        self._last_reward: float = 1e-7  # reward from the most recent step (never exactly 0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ class DataCleaningEnv:
         if ep.done:
             obs = _build_observation(ep)
             return StepResult(
-                observation=obs, reward=0.0, done=True,
+                observation=obs, reward=1e-7, done=True,
                 metadata={"error": "Episode is already done."}
             )
 
@@ -298,8 +298,11 @@ class DataCleaningEnv:
         elif phase == PipelineStep.FIX:
             bd = grade_pipeline_fix(action, cfg["known_issues"])
             ep.pipeline_scores["fix"] = bd.total
-            # Record how many issues were addressed (for validate grading)
-            ep._fix_addressed = bd.components.get("addressed", 0)
+            # Reconstruct integer count from the normalized ratio stored in components
+            issue_n = max(len(cfg["known_issues"]), 1)
+            ep._fix_addressed = int(round(
+                float(bd.components.get("addressed_ratio", 1e-7)) * issue_n
+            ))
             next_phase = PipelineStep.VALIDATE
 
         elif phase == PipelineStep.VALIDATE:
