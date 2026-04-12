@@ -22,6 +22,7 @@ from .graders import (
     grade_pipeline_fix,
     grade_pipeline_validate,
     grade_pipeline_episode,
+    safe_score,
 )
 from .models import (
     ColumnStats,
@@ -151,7 +152,7 @@ def _build_observation(ep: _Episode) -> DataObservation:
         available_actions = _available_actions(ep),
         reward          = ep._last_reward,
         done            = ep.done,
-        cumulative_reward = ep.cumulative_reward,
+        cumulative_reward = safe_score(ep.cumulative_reward),
         context         = context,
     )
 
