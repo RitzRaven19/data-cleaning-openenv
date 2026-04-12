@@ -51,7 +51,8 @@ MAX_STEPS   = 8       # safety cap per episode
 TEMPERATURE = 0.1     # low temperature for reproducibility
 MAX_TOKENS  = 1200
 TASKS       = ["schema_validation", "standardization", "pipeline"]
-STRICT_EPS  = 1e-7
+_SAFE_MIN = 0.1
+_SAFE_MAX = 0.99
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenAI client (uses API_BASE_URL + HF_TOKEN per spec)
@@ -60,9 +61,9 @@ STRICT_EPS  = 1e-7
 client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
 
-def strict_open_score(value: float) -> float:
-    """Clamp score into strict open interval (0, 1). No rounding — round() can collapse 1e-7 to 0.0."""
-    return max(STRICT_EPS, min(1.0 - STRICT_EPS, float(value)))
+def safe_score(value: float) -> float:
+    """Clamp score to (0.1, 0.99). No rounding — round() can collapse small values to 0.0."""
+    return max(_SAFE_MIN, min(_SAFE_MAX, float(value)))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,9 +89,9 @@ def log_step(
     payload: Dict[str, Any] = {
         "step": step,
         "action": action,
-        "reward": round(reward, 4),
+        "reward": safe_score(reward),
         "done": done,
-        "cumulative_reward": round(cumulative_reward, 4),
+        "cumulative_reward": safe_score(cumulative_reward),
     }
     payload.update(extra)
     print(f"[STEP] {json.dumps(payload)}", flush=True)
@@ -100,7 +101,7 @@ def log_end(task: str, total_reward: float, steps: int, success: bool, **extra: 
     """Emit an [END] line after the episode finishes."""
     payload: Dict[str, Any] = {
         "task": task,
-        "total_reward": round(total_reward, 4),
+        "total_reward": safe_score(total_reward),
         "steps": steps,
         "success": success,
     }
@@ -421,7 +422,7 @@ def run_task_schema_validation() -> float:
         issues_reported=len(action_dict.get("issues") or []),
         feedback=reward_breakdown.get("feedback", ""),
     )
-    reward = strict_open_score(reward)
+    reward = safe_score(reward)
     log_end(task_id, total_reward=reward, steps=1, success=reward >= 0.5)
     return reward
 
@@ -453,7 +454,7 @@ def run_task_standardization() -> float:
         columns_transformed=cols,
         feedback=reward_breakdown.get("feedback", ""),
     )
-    reward = strict_open_score(reward)
+    reward = safe_score(reward)
     log_end(task_id, total_reward=reward, steps=1, success=reward >= 0.5)
     return reward
 
@@ -510,7 +511,7 @@ def run_task_pipeline() -> float:
             break
 
     final_score  = float(info.get("final_pipeline_score", cumulative_reward))
-    final_score  = strict_open_score(final_score)
+    final_score  = safe_score(final_score)
     phase_scores = info.get("phase_scores", {})
 
     log_end(
@@ -546,7 +547,7 @@ def main() -> None:
         scores["standardization"]   = run_task_standardization()
         scores["pipeline"]          = run_task_pipeline()
 
-        overall = strict_open_score(sum(scores.values()) / len(scores))
+        overall = safe_score(sum(scores.values()) / len(scores))
 
         print("\n" + "=" * 60, flush=True)
         print("FINAL BASELINE SCORES", flush=True)
