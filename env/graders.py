@@ -85,8 +85,9 @@ def grade_schema_validation(
     feedback = (
         f"GT: {len(gt_keys)}, reported: {len(pred_keys)}, "
         f"exact: {exact_tp}, partial: {len(partial_locs)}. "
-        f"P={precision:.2f} R={recall:.2f} F1={f1:.2f}."
-        + (f" Missed sample: {list(missed)[:3]}" if missed else "")
+        f"P={int(safe_score(precision)*100)}pct R={int(safe_score(recall)*100)}pct "
+        f"F1={int(safe_score(f1)*100)}pct."
+        + (f" Missed: {len(missed)}" if missed else "")
     )
 
     return RewardBreakdown(
@@ -191,7 +192,7 @@ def grade_standardization(
         col_scores[col] = safe_score(correct / n if n else 0)
 
     avg = sum(col_scores.values()) / len(col_scores) if col_scores else 0
-    feedback = "Column scores -- " + ", ".join(f"{c}: {s:.2%}" for c, s in col_scores.items())
+    feedback = "Column scores -- " + ", ".join(f"{c}: {int(s*100)}pct" for c, s in col_scores.items())
 
     return RewardBreakdown(
         total=safe_score(avg),
@@ -227,8 +228,8 @@ def grade_pipeline_audit(
         total=safe_score(len(matched) / cat_n),
         components=_safe_components({"categories_found_ratio": len(matched) / cat_n}),
         feedback=(
-            f"Found {len(matched)}/{len(known_categories)}: {matched}. "
-            f"Missing: {[c for c in known_categories if c not in matched]}"
+            f"Found {len(matched)}/{len(known_categories)} categories. "
+            f"Score={int(safe_score(len(matched)/cat_n)*100)}pct"
         ),
     )
 
@@ -278,7 +279,8 @@ def grade_pipeline_fix(
         }),
         feedback=(
             f"Addressed {len(addressed)}/{len(known_issues)} issues. "
-            f"{spurious} spurious (-{penalty:.2f}). Final: {safe_score(raw):.4f}"
+            + (f"{spurious} spurious. " if spurious > 0 else "")
+            + f"Score: {int(safe_score(raw)*100)}pct"
         ),
     )
 
@@ -317,10 +319,12 @@ def grade_pipeline_validate(
             "consistency_ok":     float(consistency_ok),
         }),
         feedback=(
-            f"Report {len(report)} chars. "
-            f"length_ok={length_ok}, mentions={mentions_issues}, "
-            f"remaining_provided={remaining_provided}, consistent={consistency_ok}. "
-            f"Expected remaining ~{expected_remaining}."
+            f"Report len={len(report)}. "
+            f"len_ok={'Y' if length_ok else 'N'}, "
+            f"mentions={'Y' if mentions_issues else 'N'}, "
+            f"remaining={'Y' if remaining_provided else 'N'}, "
+            f"consistent={'Y' if consistency_ok else 'N'}. "
+            f"Score={int(safe_score(score)*100)}pct"
         ),
     )
 

@@ -96,6 +96,15 @@ def state(episode_id: str):
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@app.get("/state", response_model=StateResult)
+def state_query(episode_id: str):
+    """Return the current internal state of an episode (query-param form)."""
+    try:
+        return ENV.state(episode_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Production / management endpoints  (OpenEnv spec §3.2)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -108,11 +117,33 @@ def health():
 
 @app.get("/schema")
 def schema():
-    """Return JSON schemas for Action and Observation types."""
+    """Return JSON schemas for Action, Observation, and State types."""
     return {
         "action":      DataAction.model_json_schema(),
         "observation": DataObservation.model_json_schema(),
+        "state":       StateResult.model_json_schema(),
     }
+
+
+@app.post("/mcp")
+def mcp(request: Dict[str, Any] = Body(default_factory=dict)):
+    """Minimal MCP (Model Context Protocol) JSON-RPC 2.0 endpoint."""
+    req_id = request.get("id", None)
+    method = request.get("method", "")
+    if method == "tools/list":
+        return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": []}}
+    if method == "initialize":
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "serverInfo": {"name": "data-cleaning-env", "version": "1.0.0"},
+            },
+        }
+    # Default: acknowledge any other method
+    return {"jsonrpc": "2.0", "id": req_id, "result": {}}
 
 
 @app.get("/metadata")

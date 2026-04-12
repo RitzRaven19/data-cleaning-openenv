@@ -29,13 +29,14 @@ endpoints:
   metadata: GET  /metadata
   tasks:    GET  /tasks
   validate: POST /validate
+  mcp:      POST /mcp
 
 # ── Reward ────────────────────────────────────────────────────────────────────
-reward_range: [0.0, 1.0]
+reward_range: [0.11, 0.98]
 reward_description: >
-  All rewards are normalised to [0.0, 1.0]. Partial credit is awarded
-  throughout each episode so the agent receives signal on every step,
-  not only at the terminal state.
+  All rewards are strictly between 0 and 1 (clamped to [0.11, 0.98]).
+  Partial credit is awarded throughout each episode so the agent receives
+  signal on every step, not only at the terminal state.
 
 # ── Observation space ─────────────────────────────────────────────────────────
 observation_space:

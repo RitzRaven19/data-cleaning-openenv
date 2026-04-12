@@ -410,9 +410,6 @@ def run_task_schema_validation() -> float:
     step_result      = env_step(eid, action_dict)
     reward           = float(step_result.get("reward", 1e-7))
     done             = bool(step_result.get("done", True))
-    metadata         = step_result.get("metadata", {})
-    reward_breakdown = metadata.get("reward_breakdown", {})
-
     log_step(
         step=1,
         action=action_dict.get("action_type", "report_issues"),
@@ -420,7 +417,6 @@ def run_task_schema_validation() -> float:
         done=done,
         cumulative_reward=reward,
         issues_reported=len(action_dict.get("issues") or []),
-        feedback=reward_breakdown.get("feedback", ""),
     )
     reward = safe_score(reward)
     log_end(task_id, total_reward=reward, steps=1, success=reward >= 0.5)
@@ -438,12 +434,10 @@ def run_task_standardization() -> float:
     raw         = call_llm(SYSTEM_STANDARDIZATION, f"Dataset:\n\n{_obs_to_text(obs)}\n\nReturn the JSON action.")
     action_dict = extract_json(raw) or {"action_type": "apply_transforms", "transforms": {}}
 
-    step_result      = env_step(eid, action_dict)
-    reward           = float(step_result.get("reward", 1e-7))
-    done             = bool(step_result.get("done", True))
-    metadata         = step_result.get("metadata", {})
-    reward_breakdown = metadata.get("reward_breakdown", {})
-    cols             = list((action_dict.get("transforms") or {}).keys())
+    step_result = env_step(eid, action_dict)
+    reward      = float(step_result.get("reward", 1e-7))
+    done        = bool(step_result.get("done", True))
+    cols        = list((action_dict.get("transforms") or {}).keys())
 
     log_step(
         step=1,
@@ -452,7 +446,6 @@ def run_task_standardization() -> float:
         done=done,
         cumulative_reward=reward,
         columns_transformed=cols,
-        feedback=reward_breakdown.get("feedback", ""),
     )
     reward = safe_score(reward)
     log_end(task_id, total_reward=reward, steps=1, success=reward >= 0.5)
@@ -492,7 +485,6 @@ def run_task_pipeline() -> float:
         reward      = float(step_result.get("reward", 1e-7))
         done        = bool(step_result.get("done", False))
         info        = step_result.get("metadata", {})
-        bd          = info.get("reward_breakdown", {})
 
         step_num          += 1
         cumulative_reward += reward
@@ -504,7 +496,6 @@ def run_task_pipeline() -> float:
             done=done,
             cumulative_reward=cumulative_reward,
             phase=phase,
-            feedback=(bd.get("feedback") or "")[:120],
         )
 
         if done:
@@ -512,7 +503,7 @@ def run_task_pipeline() -> float:
 
     final_score  = float(info.get("final_pipeline_score", cumulative_reward))
     final_score  = safe_score(final_score)
-    phase_scores = info.get("phase_scores", {})
+    phase_scores = {k: safe_score(v) for k, v in info.get("phase_scores", {}).items()}
 
     log_end(
         task_id,
