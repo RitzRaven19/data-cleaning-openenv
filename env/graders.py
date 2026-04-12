@@ -2,9 +2,9 @@
 Deterministic graders for the three tasks.
 
 Each grader returns a RewardBreakdown with:
-  - total  in open interval (0, 1) — strictly between 0 and 1
-  - components: dict of sub-score names -> values
-  - feedback: human-readable explanation
+  - total      strictly in (0, 1) — never exactly 0.0 or 1.0
+  - components all values strictly in (0, 1) — booleans converted, counts normalized
+  - feedback:  human-readable explanation
 """
 
 from __future__ import annotations
@@ -31,11 +31,11 @@ def _predicted_key(issue: DataIssue) -> tuple:
 _STRICT_EPS = 1e-7
 
 
-def _strict_open_score(value: float) -> float:
+def _s(value: float) -> float:
     """
-    Enforce score in the open interval (0, 1) required by Phase 2.
-    score = max(eps, min(1 - eps, original_score))
-    No rounding — rounding to 4 decimals would collapse 1e-7 back to 0.0.
+    Clamp any float to the strict open interval (eps, 1-eps).
+    Never rounds — rounding to 4 decimals collapses 1e-7 back to 0.0.
+    Accepts booleans, integers, and floats.
     """
     return max(_STRICT_EPS, min(1.0 - _STRICT_EPS, float(value)))
 
@@ -55,8 +55,8 @@ def grade_schema_validation(
     """
     if action.action_type != "report_issues" or not action.issues:
         return RewardBreakdown(
-            total=_strict_open_score(0.0),
-            components={"precision": 0.0, "recall": 0.0, "f1": 0.0},
+            total=_s(0.0),
+            components={"precision": _s(0.0), "recall": _s(0.0), "f1": _s(0.0)},
             feedback="No issues reported. Action must be 'report_issues' with a non-empty 'issues' list.",
         )
 
@@ -82,11 +82,13 @@ def grade_schema_validation(
     else:
         f1 = 2 * precision * recall / (precision + recall)
 
-    total = _strict_open_score(f1)
+    total = _s(f1)
 
     # Penalty for excessive false positives (> 2x ground truth count)
     if len(pred_keys) > 2 * len(gt_keys):
-        total = _strict_open_score(total * 0.85)
+        total = _s(total * 0.85)
+
+    gt_n = max(len(gt_keys), 1)
 
     feedback_parts = [
         f"Ground truth: {len(gt_keys)} issues.",
@@ -96,17 +98,17 @@ def grade_schema_validation(
     ]
     missed = gt_keys - pred_keys
     if missed:
-        examples = list(missed)[:3]
-        feedback_parts.append(f"Sample missed issues: {examples}")
+        feedback_parts.append(f"Sample missed issues: {list(missed)[:3]}")
 
     return RewardBreakdown(
         total=total,
         components={
-            "exact_tp": exact_tp,
-            "partial_credit": round(partial_credit, 3),
-            "precision": round(precision, 4),
-            "recall":    round(recall, 4),
-            "f1":        round(f1, 4),
+            # Normalize counts to ratios so all values are in (0, 1)
+            "exact_tp_ratio":      _s(exact_tp / gt_n),
+            "partial_credit_ratio": _s(partial_credit / gt_n),
+            "precision":           _s(precision),
+            "recall":              _s(recall),
+            "f1":                  _s(f1),
         },
         feedback=" ".join(feedback_parts),
     )
@@ -207,7 +209,7 @@ def grade_standardization(
     """
     if action.action_type != "apply_transforms" or not action.transforms:
         return RewardBreakdown(
-            total=_strict_open_score(0.0),
+            total=_s(0.0),
             components={},
             feedback="Action must be 'apply_transforms' with a non-empty 'transforms' dict.",
         )
@@ -219,12 +221,12 @@ def grade_standardization(
     for col in columns_to_grade:
         transform = action.transforms.get(col)
         if transform is None:
-            col_scores[col] = 0.0
+            col_scores[col] = _s(0.0)
             continue
 
         fn = _TRANSFORM_FNS.get(col)
         if fn is None:
-            col_scores[col] = 0.0
+            col_scores[col] = _s(0.0)
             continue
 
         correct = 0
@@ -238,18 +240,20 @@ def grade_standardization(
             if result == expected:
                 correct += 1
 
-        col_scores[col] = correct / n
+        # correct/n can be exactly 0.0 or 1.0 — clamp to open interval
+        col_scores[col] = _s(correct / n if n else 0.0)
 
-    total = _strict_open_score(sum(col_scores.values()) / len(col_scores)) if col_scores else _strict_open_score(0.0)
+    total = _s(sum(col_scores.values()) / len(col_scores)) if col_scores else _s(0.0)
 
     feedback_parts = []
     for col, score in col_scores.items():
-        feedback_parts.append(f"{col}: {score:.0%}")
+        feedback_parts.append(f"{col}: {score:.2%}")
     feedback = "Column scores -- " + ", ".join(feedback_parts)
 
     return RewardBreakdown(
         total=total,
-        components={c: round(s, 4) for c, s in col_scores.items()},
+        # col_scores already clamped — no further rounding
+        components=dict(col_scores),
         feedback=feedback,
     )
 
@@ -268,8 +272,8 @@ def grade_pipeline_audit(
     """
     if action.action_type != "audit":
         return RewardBreakdown(
-            total=_strict_open_score(0.0),
-            components={"categories_found": 0},
+            total=_s(0.0),
+            components={"categories_found_ratio": _s(0.0)},
             feedback="Action must be 'audit' for the audit phase.",
         )
 
@@ -285,11 +289,15 @@ def grade_pipeline_audit(
             found += 1
             matched.append(cat)
 
-    score = _strict_open_score(found / len(known_categories)) if known_categories else _strict_open_score(0.0)
+    cat_n = max(len(known_categories), 1)
+    score = _s(found / cat_n)
 
     return RewardBreakdown(
         total=score,
-        components={"categories_found": found, "total_categories": len(known_categories)},
+        components={
+            # Normalized ratio — never a raw integer
+            "categories_found_ratio": _s(found / cat_n),
+        },
         feedback=(
             f"Found {found}/{len(known_categories)} issue categories: {matched}. "
             f"Missing: {[c for c in known_categories if c not in matched]}"
@@ -317,12 +325,12 @@ def grade_pipeline_fix(
     A fix_operation addresses an issue if:
       - row_index and column match a known issue
     Score = matched fixes / total known issues (capped at 1.0).
-    Bonus: -0.05 per spurious fix (fix with no matching issue), up to -0.3.
+    Penalty: -0.05 per spurious fix (fix with no matching issue), up to -0.3.
     """
     if action.action_type != "fix" or not action.fix_operations:
         return RewardBreakdown(
-            total=_strict_open_score(0.0),
-            components={"addressed": 0},
+            total=_s(0.0),
+            components={"addressed_ratio": _s(0.0)},
             feedback="Action must be 'fix' with non-empty 'fix_operations'.",
         )
 
@@ -337,23 +345,26 @@ def grade_pipeline_fix(
         else:
             spurious += 1
 
-    recall = len(addressed) / len(known_issues) if known_issues else 0.0
+    issue_n = max(len(known_issues), 1)
+    fix_n   = max(len(action.fix_operations), 1)
+
+    recall  = len(addressed) / issue_n
     penalty = min(spurious * 0.05, 0.30)
-    total = _strict_open_score(max(recall - penalty, 0.0))
+    total   = _s(max(recall - penalty, 0.0))
 
     return RewardBreakdown(
         total=total,
         components={
-            "addressed": len(addressed),
-            "total_issues": len(known_issues),
-            "spurious_fixes": spurious,
-            "recall": round(recall, 4),
-            "penalty": round(penalty, 4),
+            # All counts normalized to ratios
+            "addressed_ratio":  _s(len(addressed) / issue_n),
+            "spurious_rate":    _s(spurious / fix_n),
+            "recall":           _s(recall),
+            "penalty":          _s(penalty),
         },
         feedback=(
             f"Addressed {len(addressed)}/{len(known_issues)} issues. "
             f"{spurious} spurious fix(es) (-{penalty:.2f} penalty). "
-            f"Final: {total:.4f}"
+            f"Final: {total:.6f}"
         ),
     )
 
@@ -373,15 +384,15 @@ def grade_pipeline_validate(
     """
     if action.action_type != "validate":
         return RewardBreakdown(
-            total=_strict_open_score(0.0),
+            total=_s(0.0),
             components={},
             feedback="Action must be 'validate' for the validate phase.",
         )
 
     report = (action.validation_report or "").strip()
 
-    length_ok = len(report) >= 30
-    mentions_issues = any(
+    length_ok        = len(report) >= 30
+    mentions_issues  = any(
         word in report.lower()
         for word in ["issue", "error", "problem", "clean", "valid", "remain", "fix"]
     )
@@ -400,12 +411,13 @@ def grade_pipeline_validate(
     if consistency_ok:      score += 0.15
 
     return RewardBreakdown(
-        total=_strict_open_score(score),
+        total=_s(score),
         components={
-            "length_ok":          length_ok,
-            "mentions_issues":    mentions_issues,
-            "remaining_provided": remaining_provided,
-            "consistency_ok":     consistency_ok,
+            # Booleans converted via float() before clamping — True->1.0, False->0.0
+            "length_ok":          _s(float(length_ok)),
+            "mentions_issues":    _s(float(mentions_issues)),
+            "remaining_provided": _s(float(remaining_provided)),
+            "consistency_ok":     _s(float(consistency_ok)),
         },
         feedback=(
             f"Report length: {len(report)} chars. "
@@ -426,12 +438,13 @@ def grade_pipeline_episode(step_scores: Dict[str, float]) -> float:
       identify -> 0.30
       fix      -> 0.40
       validate -> 0.15
-    Efficiency bonus: if all 4 phases completed (no extra steps), +0.05 (capped at 1.0).
+    Efficiency bonus: if all 4 phases completed (no extra steps), +0.05 (capped).
     """
     weights = {"audit": 0.15, "identify": 0.30, "fix": 0.40, "validate": 0.15}
-    total = sum(weights[phase] * step_scores.get(phase, 0.0) for phase in weights)
+    # Each phase score fetched through _s() — default 0.0 is clamped to eps
+    total = sum(weights[phase] * _s(step_scores.get(phase, 0.0)) for phase in weights)
 
     if len(step_scores) == 4:   # exactly the 4 required phases, no wasted steps
         total += 0.05
 
-    return _strict_open_score(total)
+    return _s(total)
