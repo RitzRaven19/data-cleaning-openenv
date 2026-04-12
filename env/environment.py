@@ -211,8 +211,9 @@ class DataCleaningEnv:
 
         ep.current_step += 1
         reward_breakdown, done, next_phase = self._dispatch(ep, action)
-        # Clamp to open interval (0.001, 0.999) — validator requires strictly (0, 1)
-        reward = round(max(0.001, min(0.999, reward_breakdown.total)), 4)
+        # Clamp to open interval (eps, 1-eps) — validator requires strictly (0, 1)
+        _eps = 1e-7
+        reward = max(_eps, min(1.0 - _eps, reward_breakdown.total))
 
         # Record history entry
         ep.action_history.append({

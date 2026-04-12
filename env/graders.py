@@ -28,15 +28,16 @@ def _predicted_key(issue: DataIssue) -> tuple:
     return (issue.row_index, issue.column, issue.issue_type.value)
 
 
-_STRICT_EPS = 0.0001
+_STRICT_EPS = 1e-7
 
 
 def _strict_open_score(value: float) -> float:
     """
     Enforce score in the open interval (0, 1) required by Phase 2.
+    score = max(eps, min(1 - eps, original_score))
+    No rounding — rounding to 4 decimals would collapse 1e-7 back to 0.0.
     """
-    bounded = min(max(value, _STRICT_EPS), 1.0 - _STRICT_EPS)
-    return round(bounded, 4)
+    return max(_STRICT_EPS, min(1.0 - _STRICT_EPS, float(value)))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
