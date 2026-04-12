@@ -2,8 +2,8 @@
 Deterministic graders for the three tasks.
 
 Each grader returns a RewardBreakdown with:
-  - total  ∈ [0.0, 1.0]
-  - components: dict of sub-score names → values
+  - total  in open interval (0, 1) — strictly between 0 and 1
+  - components: dict of sub-score names -> values
   - feedback: human-readable explanation
 """
 
@@ -51,7 +51,7 @@ def grade_schema_validation(
     """
     Score the agent's list of reported issues against the ground truth.
     Uses F1 over (row_index, column, issue_type) tuples.
-    Partial credit: row/column match without correct issue_type → 0.3 credit.
+    Partial credit: row/column match without correct issue_type -> 0.3 credit.
     """
     if action.action_type != "report_issues" or not action.issues:
         return RewardBreakdown(
@@ -60,15 +60,15 @@ def grade_schema_validation(
             feedback="No issues reported. Action must be 'report_issues' with a non-empty 'issues' list.",
         )
 
-    gt_keys    = {_issue_key(i) for i in known_issues}
-    pred_keys  = {_predicted_key(i) for i in action.issues}
+    gt_keys   = {_issue_key(i) for i in known_issues}
+    pred_keys = {_predicted_key(i) for i in action.issues}
 
     # Exact matches
     exact_tp = len(gt_keys & pred_keys)
 
-    # Partial match: correct row + column but wrong issue_type → 0.3 credit each
-    gt_row_col   = {(i["row_index"], i["column"])  for i in known_issues}
-    pred_row_col = {(i.row_index,    i.column)     for i in action.issues}
+    # Partial match: correct row + column but wrong issue_type -> 0.3 credit each
+    gt_row_col   = {(i["row_index"], i["column"]) for i in known_issues}
+    pred_row_col = {(i.row_index, i.column) for i in action.issues}
     partial_only = (gt_row_col & pred_row_col) - {(k[0], k[1]) for k in (gt_keys & pred_keys)}
     partial_credit = len(partial_only) * 0.3
 
@@ -84,7 +84,7 @@ def grade_schema_validation(
 
     total = _strict_open_score(f1)
 
-    # Penalty for excessive false positives (> 2× ground truth count)
+    # Penalty for excessive false positives (> 2x ground truth count)
     if len(pred_keys) > 2 * len(gt_keys):
         total = _strict_open_score(total * 0.85)
 
@@ -97,9 +97,7 @@ def grade_schema_validation(
     missed = gt_keys - pred_keys
     if missed:
         examples = list(missed)[:3]
-        feedback_parts.append(
-            f"Sample missed issues: {examples}"
-        )
+        feedback_parts.append(f"Sample missed issues: {examples}")
 
     return RewardBreakdown(
         total=total,
@@ -118,7 +116,7 @@ def grade_schema_validation(
 # Task 2 – Standardization
 # ─────────────────────────────────────────────────────────────────────────────
 
-# State name → two-letter code mapping
+# State name -> two-letter code mapping
 _STATE_MAP: Dict[str, str] = {
     "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA",
     "colorado":"CO","connecticut":"CT","delaware":"DE","florida":"FL","georgia":"GA",
@@ -247,7 +245,7 @@ def grade_standardization(
     feedback_parts = []
     for col, score in col_scores.items():
         feedback_parts.append(f"{col}: {score:.0%}")
-    feedback = "Column scores — " + ", ".join(feedback_parts)
+    feedback = "Column scores -- " + ", ".join(feedback_parts)
 
     return RewardBreakdown(
         total=total,
@@ -306,7 +304,6 @@ def grade_pipeline_identify(
     """
     Identify step: uses the same F1-based grader as schema_validation.
     """
-    # Reuse schema validation grader
     return grade_schema_validation(action, known_issues)
 
 
@@ -355,7 +352,7 @@ def grade_pipeline_fix(
         },
         feedback=(
             f"Addressed {len(addressed)}/{len(known_issues)} issues. "
-            f"{spurious} spurious fix(es) (−{penalty:.2f} penalty). "
+            f"{spurious} spurious fix(es) (-{penalty:.2f} penalty). "
             f"Final: {total:.4f}"
         ),
     )
@@ -372,7 +369,7 @@ def grade_pipeline_validate(
     Checks:
       - Report is non-empty (min 30 chars)
       - Mentions remaining issues or confirms clean data
-      - Consistency: if issues_remaining ≤ (total - issues_fixed), give full credit
+      - Consistency: if issues_remaining <= (total - issues_fixed), give full credit
     """
     if action.action_type != "validate":
         return RewardBreakdown(
@@ -415,7 +412,7 @@ def grade_pipeline_validate(
             f"Length OK: {length_ok}, mentions issues: {mentions_issues}, "
             f"provided remaining count: {remaining_provided}, "
             f"consistent estimate: {consistency_ok}. "
-            f"Expected remaining ≈ {expected_remaining}."
+            f"Expected remaining ~{expected_remaining}."
         ),
     )
 
@@ -425,10 +422,10 @@ def grade_pipeline_episode(step_scores: Dict[str, float]) -> float:
     Combine per-phase scores into a final episode score.
 
     Weights:
-      audit    → 0.15
-      identify → 0.30
-      fix      → 0.40
-      validate → 0.15
+      audit    -> 0.15
+      identify -> 0.30
+      fix      -> 0.40
+      validate -> 0.15
     Efficiency bonus: if all 4 phases completed (no extra steps), +0.05 (capped at 1.0).
     """
     weights = {"audit": 0.15, "identify": 0.30, "fix": 0.40, "validate": 0.15}
