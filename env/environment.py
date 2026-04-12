@@ -56,7 +56,7 @@ class _Episode:
         )
         # For pipeline – accumulate per-phase scores
         self.pipeline_scores: Dict[str, float] = {}
-        self._last_reward: float = 0.1   # reward from the most recent step (safe default)
+        self._last_reward: float = 0.11  # reward from the most recent step (safe default)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -205,14 +205,14 @@ class DataCleaningEnv:
         if ep.done:
             obs = _build_observation(ep)
             return StepResult(
-                observation=obs, reward=0.1, done=True,
+                observation=obs, reward=0.11, done=True,
                 metadata={"error": "Episode is already done."}
             )
 
         ep.current_step += 1
         reward_breakdown, done, next_phase = self._dispatch(ep, action)
-        # Clamp to safe range (0.1, 0.99) — validator requires strictly (0, 1)
-        reward = max(0.1, min(0.99, float(reward_breakdown.total)))
+        # Clamp to [0.11, 0.98] — strictly inside (0.1, 0.99) inside (0, 1)
+        reward = max(0.11, min(0.98, float(reward_breakdown.total)))
 
         # Record history entry
         ep.action_history.append({

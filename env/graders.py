@@ -18,8 +18,8 @@ from .models import DataAction, DataIssue, RewardBreakdown
 # ─────────────────────────────────────────────────────────────────────────────
 
 def safe_score(x) -> float:
-    """Clamp any value to the strict open interval (0.1, 0.99)."""
-    return max(0.1, min(0.99, float(x)))
+    """Clamp any value to [0.11, 0.98] — strictly inside (0.1, 0.99)."""
+    return max(0.11, min(0.98, float(x)))
 
 
 def _safe_components(d: Dict[str, Any]) -> Dict[str, float]:

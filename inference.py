@@ -51,8 +51,8 @@ MAX_STEPS   = 8       # safety cap per episode
 TEMPERATURE = 0.1     # low temperature for reproducibility
 MAX_TOKENS  = 1200
 TASKS       = ["schema_validation", "standardization", "pipeline"]
-_SAFE_MIN = 0.1
-_SAFE_MAX = 0.99
+_SAFE_MIN = 0.11
+_SAFE_MAX = 0.98
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenAI client (uses API_BASE_URL + HF_TOKEN per spec)

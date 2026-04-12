@@ -118,7 +118,7 @@ class DataObservation(BaseModel):
 
     # Per-step reward and terminal flag — matches OpenEnv Observation contract
     # (same pattern as echo_env: EchoObservation has reward + done fields)
-    reward: float = 0.1    # safe default — validator requires strictly (0, 1)
+    reward: float = 0.11   # safe default — strictly inside (0.1, 0.99)
     done:   bool  = False
 
     # Cumulative reward so far (informational)
